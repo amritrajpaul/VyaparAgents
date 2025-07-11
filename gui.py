@@ -19,11 +19,32 @@ DEEP_MODELS = QUICK_MODELS
 
 ANALYST_NAMES = ["Market", "Social", "News", "Fundamentals"]
 
+AGENT_TEAMS = {
+    "Analyst Team": [
+        "Market Analyst",
+        "Social Analyst",
+        "News Analyst",
+        "Fundamentals Analyst",
+    ],
+    "Research Team": ["Bull Researcher", "Bear Researcher", "Research Manager"],
+    "Trading Team": ["Trader"],
+    "Risk Management": ["Risky Analyst", "Neutral Analyst", "Safe Analyst"],
+    "Portfolio Management": ["Portfolio Manager"],
+}
+
 class TradingAgentsGUI(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("TradingAgents GUI")
         self.geometry("700x750")
+        self.agent_status = {
+            agent: "pending"
+            for agents in AGENT_TEAMS.values()
+            for agent in agents
+        }
+        self.tool_calls = 0
+        self.llm_calls = 0
+        self.generated_reports = 0
         self._create_widgets()
 
     def _create_widgets(self):
@@ -60,8 +81,19 @@ class TradingAgentsGUI(tk.Tk):
         row += 1
 
         ttk.Label(frame, text="Research Depth:").grid(row=row, column=0, sticky=tk.W)
-        self.depth_var = tk.IntVar(value=1)
-        ttk.OptionMenu(frame, self.depth_var, 1, 1, 3, 5).grid(row=row, column=1, sticky="ew")
+        depth_opts = [
+            ("Shallow - Quick research, few debate rounds", 1),
+            ("Medium - Moderate debate rounds", 3),
+            ("Deep - Comprehensive research", 5),
+        ]
+        self.depth_map = {label: val for label, val in depth_opts}
+        self.depth_var = tk.StringVar(value=depth_opts[0][0])
+        ttk.OptionMenu(
+            frame,
+            self.depth_var,
+            depth_opts[0][0],
+            *[opt[0] for opt in depth_opts],
+        ).grid(row=row, column=1, sticky="ew")
         row += 1
 
         analyst_frame = ttk.LabelFrame(frame, text="Analysts")
@@ -100,8 +132,31 @@ class TradingAgentsGUI(tk.Tk):
         notebook.add(self.progress_tab, text="Progress")
         notebook.add(self.report_tab, text="Final Report")
 
-        self.progress_text = scrolledtext.ScrolledText(self.progress_tab, height=15, state="disabled")
+        self.progress_tree = ttk.Treeview(
+            self.progress_tab,
+            columns=("team", "agent", "status"),
+            show="headings",
+            height=10,
+        )
+        for col in ("team", "agent", "status"):
+            self.progress_tree.heading(col, text=col.title())
+            self.progress_tree.column(col, width=100, anchor="center")
+        self.progress_tree.pack(fill=tk.X)
+        for team, agents in AGENT_TEAMS.items():
+            first = True
+            for agent in agents:
+                team_name = team if first else ""
+                self.progress_tree.insert("", "end", iid=agent, values=(team_name, agent, "pending"))
+                first = False
+            self.progress_tree.insert("", "end")
+
+        self.progress_text = scrolledtext.ScrolledText(
+            self.progress_tab, height=10, state="disabled"
+        )
         self.progress_text.pack(fill=tk.BOTH, expand=True)
+
+        self.stats_var = tk.StringVar(value="Tool Calls: 0 | LLM Calls: 0 | Generated Reports: 0")
+        ttk.Label(self.progress_tab, textvariable=self.stats_var).pack(fill=tk.X)
 
         self.report_text = scrolledtext.ScrolledText(self.report_tab, height=15, state="disabled")
         self.report_text.pack(fill=tk.BOTH, expand=True)
@@ -136,8 +191,9 @@ class TradingAgentsGUI(tk.Tk):
             messagebox.showerror("No analysts", "Please select at least one analyst")
             return
         config = DEFAULT_CONFIG.copy()
-        config["max_debate_rounds"] = self.depth_var.get()
-        config["max_risk_discuss_rounds"] = self.depth_var.get()
+        depth_value = self.depth_map.get(self.depth_var.get(), 1)
+        config["max_debate_rounds"] = depth_value
+        config["max_risk_discuss_rounds"] = depth_value
         config["quick_think_llm"] = self.quick_model_var.get()
         config["deep_think_llm"] = self.deep_model_var.get()
         config["llm_provider"] = self.provider_var.get()
@@ -146,6 +202,14 @@ class TradingAgentsGUI(tk.Tk):
         self.progress_text.insert(tk.END, "Running analysis...\n")
         self.progress_text.config(state="disabled")
         self.progress_bar.start(10)
+        for agent in self.agent_status:
+            self.agent_status[agent] = "pending"
+            if self.progress_tree.exists(agent):
+                self.progress_tree.set(agent, column="status", value="pending")
+        self.tool_calls = 0
+        self.llm_calls = 0
+        self.generated_reports = 0
+        self._refresh_stats()
 
         self.report_text.config(state="normal")
         self.report_text.delete("1.0", tk.END)
@@ -174,8 +238,54 @@ class TradingAgentsGUI(tk.Tk):
                         "role",
                         getattr(last_message, "type", type(last_message).__name__),
                     )
+                    self.llm_calls += 1
+                    if hasattr(last_message, "tool_calls"):
+                        self.tool_calls += len(last_message.tool_calls)
                     self._append_progress(f"{role}: {content}")
 
+                # Update statuses based on reports
+                if chunk.get("market_report"):
+                    self.generated_reports += 1
+                    self._update_status("Market Analyst", "completed")
+                    if "social" in analysts:
+                        self._update_status("Social Analyst", "in_progress")
+
+                if chunk.get("sentiment_report"):
+                    self.generated_reports += 1
+                    self._update_status("Social Analyst", "completed")
+                    if "news" in analysts:
+                        self._update_status("News Analyst", "in_progress")
+
+                if chunk.get("news_report"):
+                    self.generated_reports += 1
+                    self._update_status("News Analyst", "completed")
+                    if "fundamentals" in analysts:
+                        self._update_status("Fundamentals Analyst", "in_progress")
+
+                if chunk.get("fundamentals_report"):
+                    self.generated_reports += 1
+                    self._update_status("Fundamentals Analyst", "completed")
+
+                if chunk.get("investment_plan"):
+                    self.generated_reports += 1
+                    self._update_status("Bull Researcher", "completed")
+                    self._update_status("Bear Researcher", "completed")
+                    self._update_status("Research Manager", "completed")
+                    self._update_status("Trader", "in_progress")
+
+                if chunk.get("trader_investment_plan"):
+                    self.generated_reports += 1
+                    self._update_status("Trader", "completed")
+                    self._update_status("Risky Analyst", "in_progress")
+
+                if chunk.get("final_trade_decision"):
+                    self.generated_reports += 1
+                    self._update_status("Risky Analyst", "completed")
+                    self._update_status("Safe Analyst", "completed")
+                    self._update_status("Neutral Analyst", "completed")
+                    self._update_status("Portfolio Manager", "completed")
+
+                self._refresh_stats()
                 trace.append(chunk)
 
             final_state = trace[-1]
@@ -198,6 +308,15 @@ class TradingAgentsGUI(tk.Tk):
 
         self.after(0, _update)
 
+    def _update_status(self, agent, status):
+        self.agent_status[agent] = status
+        self.progress_tree.set(agent, column="status", value=status)
+
+    def _refresh_stats(self):
+        self.stats_var.set(
+            f"Tool Calls: {self.tool_calls} | LLM Calls: {self.llm_calls} | Generated Reports: {self.generated_reports}"
+        )
+
     def _update_report(self, report, decision):
         def _fill():
             self.report_text.config(state="normal")
@@ -205,6 +324,7 @@ class TradingAgentsGUI(tk.Tk):
             self.report_text.insert(tk.END, f"\n\nFinal Decision:\n{decision}\n")
             self.report_text.see(tk.END)
             self.report_text.config(state="disabled")
+            self._refresh_stats()
 
         self.after(0, _fill)
 
