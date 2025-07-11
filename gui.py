@@ -19,6 +19,7 @@ DEEP_MODELS = QUICK_MODELS
 
 ANALYST_NAMES = ["Market", "Social", "News", "Fundamentals"]
 
+
 class TradingAgentsGUI(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -126,7 +127,9 @@ class TradingAgentsGUI(tk.Tk):
         for key, var in self.key_vars.items():
             if var.get():
                 os.environ[key] = var.get()
+
         selected_analysts = [name.lower() for name, var in self.analyst_vars if var.get()]
+
         if not selected_analysts:
             messagebox.showerror("No analysts", "Please select at least one analyst")
             return
