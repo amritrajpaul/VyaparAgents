@@ -28,7 +28,7 @@ class TradingAgentsGUI(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("TradingAgents GUI")
-        self.geometry("600x700")
+        self.geometry("700x750")
         self._create_widgets()
 
     def _create_widgets(self):
@@ -88,10 +88,21 @@ class TradingAgentsGUI(tk.Tk):
         ttk.Button(frame, text="Run Analysis", command=self.run_analysis).grid(row=row, column=0, columnspan=2, pady=10)
         row += 1
 
-        self.output = scrolledtext.ScrolledText(frame, height=15)
-        self.output.grid(row=row, column=0, columnspan=2, sticky="nsew")
+        notebook = ttk.Notebook(frame)
+        notebook.grid(row=row, column=0, columnspan=2, sticky="nsew")
         frame.columnconfigure(1, weight=1)
         frame.rowconfigure(row, weight=1)
+
+        self.progress_tab = ttk.Frame(notebook)
+        self.report_tab = ttk.Frame(notebook)
+        notebook.add(self.progress_tab, text="Progress")
+        notebook.add(self.report_tab, text="Final Report")
+
+        self.progress_text = scrolledtext.ScrolledText(self.progress_tab, height=15, state="disabled")
+        self.progress_text.pack(fill=tk.BOTH, expand=True)
+
+        self.report_text = scrolledtext.ScrolledText(self.report_tab, height=15, state="disabled")
+        self.report_text.pack(fill=tk.BOTH, expand=True)
 
     def _update_models(self, *_):
         provider = self.provider_var.get()
@@ -127,17 +138,79 @@ class TradingAgentsGUI(tk.Tk):
         config["quick_think_llm"] = self.quick_model_var.get()
         config["deep_think_llm"] = self.deep_model_var.get()
         config["llm_provider"] = self.provider_var.get()
-        self.output.delete("1.0", tk.END)
-        self.output.insert(tk.END, "Running analysis...\n")
-        threading.Thread(target=self._run_graph, args=(selected_analysts, config), daemon=True).start()
+        self.progress_text.config(state="normal")
+        self.progress_text.delete("1.0", tk.END)
+        self.progress_text.insert(tk.END, "Running analysis...\n")
+        self.progress_text.config(state="disabled")
+        self.report_text.config(state="normal")
+        self.report_text.delete("1.0", tk.END)
+        self.report_text.config(state="disabled")
+        threading.Thread(
+            target=self._run_graph,
+            args=(selected_analysts, config),
+            daemon=True,
+        ).start()
 
     def _run_graph(self, analysts, config):
         try:
-            graph = TradingAgentsGraph(analysts, debug=False, config=config)
-            _, decision = graph.propagate(self.ticker_var.get(), self.date_var.get())
-            self.output.insert(tk.END, f"\nFinal Decision:\n{decision}\n")
+            graph = TradingAgentsGraph(analysts, debug=True, config=config)
+            init_state = graph.propagator.create_initial_state(
+                self.ticker_var.get(), self.date_var.get()
+            )
+            args = graph.propagator.get_graph_args()
+
+            trace = []
+            for chunk in graph.graph.stream(init_state, **args):
+                if chunk.get("messages"):
+                    last_message = chunk["messages"][-1]
+                    content = getattr(last_message, "content", str(last_message))
+                    self._append_progress(f"{last_message.role}: {content}")
+                trace.append(chunk)
+
+            final_state = trace[-1]
+            decision = graph.process_signal(final_state["final_trade_decision"])
+            self._append_progress("\nAnalysis complete\n")
+            report = self._build_final_report(final_state)
+            self._update_report(report, decision)
         except Exception as e:
-            self.output.insert(tk.END, f"\nError: {e}\n")
+            self._append_progress(f"\nError: {e}\n")
+
+    def _append_progress(self, text):
+        def _update():
+            self.progress_text.config(state="normal")
+            self.progress_text.insert(tk.END, text + "\n")
+            self.progress_text.see(tk.END)
+            self.progress_text.config(state="disabled")
+
+        self.progress_text.after(0, _update)
+
+    def _update_report(self, report, decision):
+        def _fill():
+            self.report_text.config(state="normal")
+            self.report_text.insert(tk.END, report)
+            self.report_text.insert(tk.END, f"\n\nFinal Decision:\n{decision}\n")
+            self.report_text.see(tk.END)
+            self.report_text.config(state="disabled")
+
+        self.report_text.after(0, _fill)
+
+    def _build_final_report(self, state):
+        sections = []
+        if state.get("market_report"):
+            sections.append("## Market Analysis\n" + state["market_report"])
+        if state.get("sentiment_report"):
+            sections.append("## Social Sentiment\n" + state["sentiment_report"])
+        if state.get("news_report"):
+            sections.append("## News Analysis\n" + state["news_report"])
+        if state.get("fundamentals_report"):
+            sections.append("## Fundamentals Analysis\n" + state["fundamentals_report"])
+        if state.get("investment_plan"):
+            sections.append("## Research Team Decision\n" + state["investment_plan"])
+        if state.get("trader_investment_plan"):
+            sections.append("## Trading Team Plan\n" + state["trader_investment_plan"])
+        if state.get("final_trade_decision"):
+            sections.append("## Portfolio Management Decision\n" + state["final_trade_decision"])
+        return "\n\n".join(sections)
 
 
 def main():
