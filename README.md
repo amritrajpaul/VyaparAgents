@@ -156,7 +156,6 @@ python gui.py
 
 The window lets you pick tickers, choose LLM models and input API keys. Progress
 updates stream live in the **Progress** tab and the final report appears in the
-
 **Final Report** tab. Leave any API key field blank to use the value from your
 environment. A progress bar shows when analysis is running.
 

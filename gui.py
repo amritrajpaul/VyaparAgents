@@ -169,7 +169,13 @@ class TradingAgentsGUI(tk.Tk):
                 if chunk.get("messages"):
                     last_message = chunk["messages"][-1]
                     content = getattr(last_message, "content", str(last_message))
-                    self._append_progress(f"{last_message.role}: {content}")
+                    role = getattr(
+                        last_message,
+                        "role",
+                        getattr(last_message, "type", type(last_message).__name__),
+                    )
+                    self._append_progress(f"{role}: {content}")
+
                 trace.append(chunk)
 
             final_state = trace[-1]
