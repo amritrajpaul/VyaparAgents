@@ -19,7 +19,6 @@ DEEP_MODELS = QUICK_MODELS
 
 ANALYST_NAMES = ["Market", "Social", "News", "Fundamentals"]
 
-
 class TradingAgentsGUI(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -87,6 +86,10 @@ class TradingAgentsGUI(tk.Tk):
         ttk.Button(frame, text="Run Analysis", command=self.run_analysis).grid(row=row, column=0, columnspan=2, pady=10)
         row += 1
 
+        self.progress_bar = ttk.Progressbar(frame, mode="indeterminate")
+        self.progress_bar.grid(row=row, column=0, columnspan=2, sticky="ew")
+        row += 1
+
         notebook = ttk.Notebook(frame)
         notebook.grid(row=row, column=0, columnspan=2, sticky="nsew")
         frame.columnconfigure(1, weight=1)
@@ -127,7 +130,6 @@ class TradingAgentsGUI(tk.Tk):
         for key, var in self.key_vars.items():
             if var.get():
                 os.environ[key] = var.get()
-
         selected_analysts = [name.lower() for name, var in self.analyst_vars if var.get()]
 
         if not selected_analysts:
@@ -143,6 +145,8 @@ class TradingAgentsGUI(tk.Tk):
         self.progress_text.delete("1.0", tk.END)
         self.progress_text.insert(tk.END, "Running analysis...\n")
         self.progress_text.config(state="disabled")
+        self.progress_bar.start(10)
+
         self.report_text.config(state="normal")
         self.report_text.delete("1.0", tk.END)
         self.report_text.config(state="disabled")
@@ -175,6 +179,9 @@ class TradingAgentsGUI(tk.Tk):
             self._update_report(report, decision)
         except Exception as e:
             self._append_progress(f"\nError: {e}\n")
+        finally:
+            self.after(0, self.progress_bar.stop)
+
 
     def _append_progress(self, text):
         def _update():
