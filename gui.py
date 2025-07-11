@@ -17,12 +17,8 @@ QUICK_MODELS = {
 
 DEEP_MODELS = QUICK_MODELS
 
-ANALYSTS = [
-    ("Market", tk.BooleanVar(value=True)),
-    ("Social", tk.BooleanVar(value=True)),
-    ("News", tk.BooleanVar(value=True)),
-    ("Fundamentals", tk.BooleanVar(value=True)),
-]
+ANALYST_NAMES = ["Market", "Social", "News", "Fundamentals"]
+
 
 class TradingAgentsGUI(tk.Tk):
     def __init__(self):
@@ -71,7 +67,10 @@ class TradingAgentsGUI(tk.Tk):
 
         analyst_frame = ttk.LabelFrame(frame, text="Analysts")
         analyst_frame.grid(row=row, column=0, columnspan=2, sticky="ew")
-        for i, (name, var) in enumerate(ANALYSTS):
+        self.analyst_vars = []
+        for i, name in enumerate(ANALYST_NAMES):
+            var = tk.BooleanVar(value=True)
+            self.analyst_vars.append((name, var))
             ttk.Checkbutton(analyst_frame, text=name, variable=var).grid(row=0, column=i, padx=5)
         row += 1
 
@@ -128,7 +127,9 @@ class TradingAgentsGUI(tk.Tk):
         for key, var in self.key_vars.items():
             if var.get():
                 os.environ[key] = var.get()
-        selected_analysts = [name.lower() for name, var in ANALYSTS if var.get()]
+
+        selected_analysts = [name.lower() for name, var in self.analyst_vars if var.get()]
+
         if not selected_analysts:
             messagebox.showerror("No analysts", "Please select at least one analyst")
             return
