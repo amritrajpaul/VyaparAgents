@@ -182,7 +182,7 @@ class TradingAgentsGUI(tk.Tk):
             self.progress_text.see(tk.END)
             self.progress_text.config(state="disabled")
 
-        self.progress_text.after(0, _update)
+        self.after(0, _update)
 
     def _update_report(self, report, decision):
         def _fill():
@@ -192,7 +192,7 @@ class TradingAgentsGUI(tk.Tk):
             self.report_text.see(tk.END)
             self.report_text.config(state="disabled")
 
-        self.report_text.after(0, _fill)
+        self.after(0, _fill)
 
     def _build_final_report(self, state):
         sections = []
