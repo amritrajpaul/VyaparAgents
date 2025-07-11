@@ -131,6 +131,7 @@ class TradingAgentsGUI(tk.Tk):
             if var.get():
                 os.environ[key] = var.get()
         selected_analysts = [name.lower() for name, var in self.analyst_vars if var.get()]
+
         if not selected_analysts:
             messagebox.showerror("No analysts", "Please select at least one analyst")
             return
@@ -145,6 +146,7 @@ class TradingAgentsGUI(tk.Tk):
         self.progress_text.insert(tk.END, "Running analysis...\n")
         self.progress_text.config(state="disabled")
         self.progress_bar.start(10)
+
         self.report_text.config(state="normal")
         self.report_text.delete("1.0", tk.END)
         self.report_text.config(state="disabled")
@@ -173,6 +175,7 @@ class TradingAgentsGUI(tk.Tk):
                         getattr(last_message, "type", type(last_message).__name__),
                     )
                     self._append_progress(f"{role}: {content}")
+
                 trace.append(chunk)
 
             final_state = trace[-1]
@@ -184,6 +187,7 @@ class TradingAgentsGUI(tk.Tk):
             self._append_progress(f"\nError: {e}\n")
         finally:
             self.after(0, self.progress_bar.stop)
+
 
     def _append_progress(self, text):
         def _update():
