@@ -146,6 +146,19 @@ An interface will appear showing results as they load, letting you track the age
   <img src="assets/cli/cli_transaction.png" width="100%" style="display: inline-block; margin: 0 2%;">
 </p>
 
+### GUI Usage
+
+If you prefer a graphical interface, launch the GUI with:
+
+```bash
+python gui.py
+```
+
+The window lets you pick tickers, choose LLM models and input API keys. Progress
+updates stream live in the **Progress** tab and the final report appears in the
+**Final Report** tab. Leave any API key field blank to use the value from your
+environment. A progress bar shows when analysis is running.
+
 ## TradingAgents Package
 
 ### Implementation Details
